@@ -1,99 +1,190 @@
+import tkinter as tk
+from tkinter import ttk
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import tkinter as tk
 
-# Signal generation (sin or cos)
-def generate_signal(A, f, phase, t, signal_type='sin'):
+def generate_signal(A, f, phase, t, signal_type='cos'):
+    """Generate a sine or cosine signal."""
     w = 2 * np.pi * f
-    return A * np.sin(w * t + phase) if signal_type == 'sin' else A * np.cos(w * t + phase)
+    if signal_type == 'sin':
+        return A * np.sin(w * t + phase)
+    return A * np.cos(w * t + phase)
 
-# Fourier series signal from coefficients
-def generate_fourier_series(a0, ak, bk, w0, t):
-    signal = a0 * np.ones_like(t)
-    for k in range(1, 4):
-        signal += ak[k-1] * np.cos(k * w0 * t) + bk[k-1] * np.sin(k * w0 * t)
-    return signal
+# Main window
+form = tk.Tk()
+form.geometry("1300x750")
+form.title("Signal Synthesizer and Fourier Series GUI")
 
-# Button function: generate plots
-def plot_signals():
-    try:
-        A_vals = [float(e.get()) for e in entries_A]
-        f_vals = [float(e.get()) for e in entries_f]
-        phase_vals = [float(e.get()) for e in entries_phase]
-        signal_types = [v.get() for v in var_signal_type]
+# Frame for plots
+graphics_frame = tk.Frame(form)
+graphics_frame.grid(row=0, column=0, rowspan=5, padx=10, pady=10, sticky="nsew")
 
-        a0 = float(entry_a0.get())
-        ak = [float(e.get()) for e in entries_ak]
-        bk = [float(e.get()) for e in entries_bk]
-        w0 = float(entry_w0.get())
-
-        t = np.linspace(0, 1, 1000)
-        signals = []
-
-        fig, axs = plt.subplots(5, 1, figsize=(7, 10))
-        fig.tight_layout(pad=3.0)
-
-        # Plot sin/cos signals
-        for i in range(3):
-            sig = generate_signal(A_vals[i], f_vals[i], phase_vals[i], t, signal_types[i])
-            signals.append(sig)
-            axs[i].plot(t, sig)
-            axs[i].set_title(f'{signal_types[i].capitalize()} Signal {i+1}')
-            axs[i].grid(True)
-
-        # Synthesized signal
-        synth = sum(signals)
-        axs[3].plot(t, synth, color='purple')
-        axs[3].set_title('Synthesized Signal (Sum of 3)')
-        axs[3].grid(True)
-
-        # Fourier Series
-        fourier_signal = generate_fourier_series(a0, ak, bk, w0, t)
-        axs[4].plot(t, fourier_signal, color='green')
-        axs[4].set_title('Fourier Series Approximation (k=1..3)')
-        axs[4].grid(True)
-
-        # Embed in Tkinter
-        canvas = FigureCanvasTkAgg(fig, master=window)
-        canvas.get_tk_widget().grid(row=9, column=0, columnspan=6)
-        canvas.draw()
-
-    except ValueError:
-        print("Please fill all inputs with valid numbers.")
-
-# === GUI Setup ===
-window = tk.Tk()
-window.title("Signal Synthesizer and Fourier Series GUI")
-
-entries_A, entries_f, entries_phase, var_signal_type = [], [], [], []
-
-# Inputs for A, f, theta, and type
+# Create input frames for 3 signals
+signal_frames = []
 for i in range(3):
-    tk.Label(window, text=f"Signal {i+1} - A, f, θ").grid(row=0, column=i*2, columnspan=2)
-    a = tk.Entry(window); a.grid(row=1, column=i*2); entries_A.append(a)
-    f = tk.Entry(window); f.grid(row=1, column=i*2 + 1); entries_f.append(f)
-    p = tk.Entry(window); p.grid(row=2, column=i*2); entries_phase.append(p)
+    frame = tk.LabelFrame(form, text=f"{i+1}. Sinyal Değerleri", bg="#f0f0f0")
+    frame.grid(row=i, column=1, padx=10, pady=5, sticky="n")
+    signal_frames.append(frame)
 
-    var = tk.StringVar(value='sin')
-    tk.OptionMenu(window, var, 'sin', 'cos').grid(row=2, column=i*2 + 1)
-    var_signal_type.append(var)
+# Frame for sum signal and DC component
+signal_sum = tk.LabelFrame(form, text="Toplam Sinyal ve DC Bileşeni", bg="#f0f0f0")
+signal_sum.grid(row=3, column=1, padx=10, pady=5, sticky="n")
 
-# Fourier Coefficient inputs
-tk.Label(window, text="Fourier Coefficients: a₀").grid(row=3, column=0)
-entry_a0 = tk.Entry(window); entry_a0.grid(row=3, column=1)
+# Entries and dropdowns for each signal
+entries = []     # list of (amp_entry, freq_entry, phase_entry)
+var_types = []   # list of StringVar for 'sin'/'cos'
+for frame in signal_frames:
+    tk.Label(frame, text="Genlik:").grid(row=0, column=0, sticky="w", padx=5, pady=2)
+    amp = tk.Entry(frame, width=10)
+    amp.grid(row=0, column=1, padx=5, pady=2)
+    amp.insert(0, "0")
 
-entries_ak, entries_bk = [], []
-for k in range(3):
-    tk.Label(window, text=f"a{k+1}").grid(row=4, column=k)
-    ak_entry = tk.Entry(window); ak_entry.grid(row=5, column=k); entries_ak.append(ak_entry)
+    tk.Label(frame, text="Frekans (Hz):").grid(row=1, column=0, sticky="w", padx=5, pady=2)
+    freq = tk.Entry(frame, width=10)
+    freq.grid(row=1, column=1, padx=5, pady=2)
+    freq.insert(0, "0")
 
-    tk.Label(window, text=f"b{k+1}").grid(row=6, column=k)
-    bk_entry = tk.Entry(window); bk_entry.grid(row=7, column=k); entries_bk.append(bk_entry)
+    tk.Label(frame, text="Faz (°):").grid(row=2, column=0, sticky="w", padx=5, pady=2)
+    ph = tk.Entry(frame, width=10)
+    ph.grid(row=2, column=1, padx=5, pady=2)
+    ph.insert(0, "0")
 
-tk.Label(window, text="ω₀").grid(row=4, column=3)
-entry_w0 = tk.Entry(window); entry_w0.grid(row=5, column=3)
+    tk.Label(frame, text="Tip:").grid(row=0, column=2, sticky="w", padx=5, pady=2)
+    var = tk.StringVar(value='cos')
+    ttk.OptionMenu(frame, var, 'cos', 'sin', 'cos').grid(row=0, column=3, padx=5, pady=2)
 
-tk.Button(window, text="Plot Signals", command=plot_signals).grid(row=8, column=0, columnspan=6)
+    entries.append((amp, freq, ph))
+    var_types.append(var)
 
-window.mainloop()
+# DC component input
+tk.Label(signal_sum, text="DC Bileşen (a0):").grid(row=0, column=0, sticky="w", padx=5, pady=2)
+entry_a0 = tk.Entry(signal_sum, width=10)
+entry_a0.grid(row=0, column=1, padx=5, pady=2)
+entry_a0.insert(0, "0")
+
+# Labels to display sum signal properties
+tk.Label(signal_sum, text="Genlik:").grid(row=1, column=0, sticky="w", padx=5, pady=2)
+sumA = tk.Label(signal_sum, text="0")
+sumA.grid(row=1, column=1, sticky="w")
+
+tk.Label(signal_sum, text="Frekans:").grid(row=2, column=0, sticky="w", padx=5, pady=2)
+sumf = tk.Label(signal_sum, text="0")
+sumf.grid(row=2, column=1, sticky="w")
+
+tk.Label(signal_sum, text="Faz:").grid(row=3, column=0, sticky="w", padx=5, pady=2)
+sumtheta = tk.Label(signal_sum, text="0")
+sumtheta.grid(row=3, column=1, sticky="w")
+
+def draw():
+    # Read inputs
+    amps, freqs, phases, types = [], [], [], []
+    for (amp_e, freq_e, ph_e), var in zip(entries, var_types):
+        amps.append(float(amp_e.get()))
+        freqs.append(float(freq_e.get()))
+        # convert degrees to radians
+        phases.append(float(ph_e.get()) * np.pi / 180)
+        types.append(var.get())
+
+    a0_val = float(entry_a0.get())
+    # Time axis
+    t = np.linspace(-2, 2, 1000)
+
+    # Generate individual signals
+    y_list = [
+        generate_signal(A, f, phi, t, signal_type=typ)
+        for A, f, phi, typ in zip(amps, freqs, phases, types)
+    ]
+
+    # Sum with DC component
+    y_sum = a0_val + sum(y_list)
+
+    # Compute sum properties
+    ampl_sum = (np.max(y_sum) - np.min(y_sum)) / 2
+    freq_sum = freqs[0] if freqs else 0
+    phase_sum = np.arctan2(
+        sum(A * np.sin(phi) for A, phi in zip(amps, phases)),
+        sum(A * np.cos(phi) for A, phi in zip(amps, phases))
+    )
+    phase_sum_deg = np.degrees(phase_sum)
+
+    # Update labels
+    sumA.config(text=f"{ampl_sum:.2f}")
+    sumf.config(text=f"{freq_sum:.2f}")
+    sumtheta.config(text=f"{phase_sum_deg:.2f}")
+
+    # Clear previous plot
+    for widget in graphics_frame.winfo_children():
+        widget.destroy()
+
+    # Create figure & subplots
+    fig = Figure(figsize=(10, 6), dpi=100)
+    ax1 = fig.add_subplot(411)
+    ax1.plot(t, y_list[0]); ax1.set_title("Sinyal 1"); ax1.grid(True)
+    ax2 = fig.add_subplot(412)
+    ax2.plot(t, y_list[1]); ax2.set_title("Sinyal 2"); ax2.grid(True)
+    ax3 = fig.add_subplot(413)
+    ax3.plot(t, y_list[2]); ax3.set_title("Sinyal 3"); ax3.grid(True)
+    ax4 = fig.add_subplot(414)
+    ax4.plot(t, y_sum, color="red"); ax4.set_title("Toplam Sinyal"); ax4.grid(True)
+
+    # Embed in Tkinter
+    canvas = FigureCanvasTkAgg(fig, master=graphics_frame)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill="both", expand=True)
+
+# Draw button
+tk.Button(form, text="Çizdir", command=draw).grid(row=5, column=1, pady=10)
+
+def open_fourier():
+    win = tk.Toplevel(form)
+    win.title("Fourier Serisi Girdileri")
+
+    ent_a, ent_b = [], []
+    for i in range(3):
+        tk.Label(win, text=f"a{i+1}:").grid(row=i, column=0, padx=5, pady=2)
+        ea = tk.Entry(win, width=10); ea.grid(row=i, column=1); ea.insert(0, "0")
+        ent_a.append(ea)
+
+        tk.Label(win, text=f"b{i+1}:").grid(row=i, column=2, padx=5, pady=2)
+        eb = tk.Entry(win, width=10); eb.grid(row=i, column=3); eb.insert(0, "0")
+        ent_b.append(eb)
+
+    tk.Label(win, text="a0:").grid(row=3, column=0, padx=5, pady=2)
+    ea0 = tk.Entry(win, width=10); ea0.grid(row=3, column=1); ea0.insert(0, "0")
+
+    tk.Label(win, text="ω0 (rad/s):").grid(row=3, column=2, padx=5, pady=2)
+    ew0 = tk.Entry(win, width=10); ew0.grid(row=3, column=3); ew0.insert(0, "6.28")
+
+    def convert():
+        a0c = float(ea0.get())
+        w0c = float(ew0.get())
+
+        # Convert coefficients to amplitude/phase and update main GUI
+        for i, (ea, eb) in enumerate(zip(ent_a, ent_b)):
+            ak = float(ea.get()); bk = float(eb.get())
+            A_val = np.hypot(ak, bk)
+            phi = np.arctan2(-bk, ak)
+            # Update entries
+            entries[i][0].delete(0, tk.END)
+            entries[i][0].insert(0, f"{A_val:.2f}")
+            entries[i][1].delete(0, tk.END)
+            entries[i][1].insert(0, f"{w0c:.2f}")
+            entries[i][2].delete(0, tk.END)
+            entries[i][2].insert(0, f"{np.degrees(phi):.2f}")
+
+        # Update DC component
+        entry_a0.delete(0, tk.END)
+        entry_a0.insert(0, f"{a0c:.2f}")
+        win.destroy()
+
+    tk.Button(win, text="Fourier Dönüştür", command=convert).grid(row=4, columnspan=4, pady=10)
+
+# Button to open Fourier input window
+fourier_btn_frame = tk.Frame(form)
+fourier_btn_frame.grid(row=4, column=1, pady=10)
+tk.Button(fourier_btn_frame, text="Sin-Cos Formu", command=open_fourier).pack()
+
+# Start GUI event loop
+form.mainloop()
